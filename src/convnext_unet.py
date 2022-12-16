@@ -180,23 +180,19 @@ class U_ConvNext(nn.Module):
         x2 = self.Maxpool(x1)
         x2 = self.Conv2(x2)
         x2 = self.Conv2x(x2)
-        x2 = self.dropout(x2)
-
+        
         x3 = self.Maxpool(x2)
         x3 = self.Conv3(x3)
         x3 = self.Conv3x(x3)
-        x3 = self.dropout(x3)
-
+       
         x4 = self.Maxpool(x3)
         x4 = self.Conv4(x4)
         x4 = self.Conv4x(x4)
-        x4 = self.dropout(x4)
-
+        
         x5 = self.Maxpool(x4)
         x5 = self.Conv5(x5)
         x5 = self.Conv5x(x5)
-        x5 = self.dropout(x5)
-       
+              
         # decoding + concat path
        
         d5 = self.Up5(x5)
