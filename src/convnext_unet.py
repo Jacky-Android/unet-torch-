@@ -103,22 +103,23 @@ class UpConvNext2(nn.Module):
     def __init__(self, ch_in, ch_out):
         super().__init__()
         self.upscale_factor = 2
-        self.pixel = nn.PixelShuffle(upscale_factor=self.upscale_factor)
+        #self.pixel = nn.PixelShuffle(upscale_factor=self.upscale_factor)
         self.up = nn.ConvTranspose2d(
-            ch_in // self.upscale_factor ** 2,
-            ch_out,
-            kernel_size=3,
-            stride=1,
-            padding=1,
+            ch_in ,
+            ch_in//2,
+            kernel_size=2,
+            stride=2,
+            padding=0,
         )
-        self.norm = LayerNorm(ch_out, eps=1e-6)
+        #self.norm = LayerNorm(ch_out, eps=1e-6)
         self.act = nn.GELU()
 
     def forward(self, x):
-        x = self.pixel(x)
+        #x = self.pixel(x)
+       
         x = self.up(x)
         x = x.permute(0, 2, 3, 1)  # (N, C, H, W) -> (N, H, W, C)
-        x = self.norm(x)
+        #x = self.norm(x)
         x = x.permute(0, 3, 1, 2)  # (N, H, W, C) -> (N, C, H, W)
         x = self.act(x)
         return x
@@ -140,7 +141,7 @@ class U_ConvNext(nn.Module):
     Version 1 using jast ConvNext_block. No bach normalization and no relu.
     """
 
-    def __init__(self, img_ch=3,  num_classes: int = 2,channels:int=24):
+    def __init__(self, img_ch=3, num_classes: int = 2,channels:int=24):
         super().__init__()
         self.Maxpool = nn.AvgPool2d(kernel_size=2, stride=2)
         self.dropout = nn.Dropout(0.5)
@@ -189,6 +190,7 @@ class U_ConvNext(nn.Module):
         x5 = self.dropout(x5)
        
         # decoding + concat path
+       
         d5 = self.Up5(x5)
         d5 = torch.cat([d5,x4], dim=1)
         d5 = self.Up_conv5(d5)
