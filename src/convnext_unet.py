@@ -48,8 +48,7 @@ class ConvNectBlock(nn.Module):
     def __init__(self, dim, drop_path=0.0, layer_scale_init_value=1e-6):
         super().__init__()
         self.dwconv = nn.Conv2d(
-            dim, dim, kernel_size=7, padding=3, groups=dim
-        )  # depthwise conv
+            dim, dim, kernel_size=7, padding=3, groups=dim)  # depthwise conv
         self.norm = LayerNorm(dim, eps=1e-6)
         self.pwconv1 = nn.Linear(
             dim, 4 * dim
@@ -143,14 +142,18 @@ class U_ConvNext(nn.Module):
 
     def __init__(self, img_ch=3, num_classes: int = 2,channels:int=24):
         super().__init__()
-        self.Maxpool = nn.AvgPool2d(kernel_size=2, stride=2)
-        self.dropout = nn.Dropout(0.5)
+        self.Maxpool = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.dropout = nn.Dropout(0.125)
 
         self.Conv1 = ConvNext_block(ch_in=img_ch, ch_out=channels)
         self.Conv2 = ConvNext_block(ch_in=channels, ch_out=channels * 2)
+        self.Conv2x = ConvNext_block(ch_in=channels*2, ch_out=channels * 2)
         self.Conv3 = ConvNext_block(ch_in=channels * 2, ch_out=channels * 4)
+        self.Conv3x = ConvNext_block(ch_in=channels * 4, ch_out=channels * 4)
         self.Conv4 = ConvNext_block(ch_in=channels * 4, ch_out=channels * 8)
+        self.Conv4x = ConvNext_block(ch_in=channels * 8, ch_out=channels * 8)
         self.Conv5 = ConvNext_block(ch_in=channels * 8, ch_out=channels * 16)
+        self.Conv5x = ConvNext_block(ch_in=channels * 16, ch_out=channels * 16)
 
         self.Up5 = UpConvNext2(ch_in=channels * 16, ch_out=channels * 8)
         self.Up_conv5 = ConvNext_block(ch_in=channels * 16, ch_out=channels * 8)
@@ -172,21 +175,26 @@ class U_ConvNext(nn.Module):
     def forward(self, x):
         # encoding path
         x1 = self.Conv1(x)
+        
 
         x2 = self.Maxpool(x1)
         x2 = self.Conv2(x2)
+        x2 = self.Conv2x(x2)
         x2 = self.dropout(x2)
 
         x3 = self.Maxpool(x2)
         x3 = self.Conv3(x3)
+        x3 = self.Conv3x(x3)
         x3 = self.dropout(x3)
 
         x4 = self.Maxpool(x3)
         x4 = self.Conv4(x4)
+        x4 = self.Conv4x(x4)
         x4 = self.dropout(x4)
 
         x5 = self.Maxpool(x4)
         x5 = self.Conv5(x5)
+        x5 = self.Conv5x(x5)
         x5 = self.dropout(x5)
        
         # decoding + concat path
