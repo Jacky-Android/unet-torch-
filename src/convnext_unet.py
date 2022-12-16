@@ -140,7 +140,7 @@ class U_ConvNext(nn.Module):
     Version 1 using jast ConvNext_block. No bach normalization and no relu.
     """
 
-    def __init__(self, img_ch=3, output_ch=2, num_classes: int = 2,channels=24):
+    def __init__(self, img_ch=3,  num_classes: int = 2,channels:int=24):
         super().__init__()
         self.Maxpool = nn.AvgPool2d(kernel_size=2, stride=2)
         self.dropout = nn.Dropout(0.5)
@@ -164,7 +164,7 @@ class U_ConvNext(nn.Module):
         self.Up_conv2 = ConvNext_block(ch_in=channels * 2, ch_out=channels)
 
         self.Conv_1x1 = nn.Conv2d(
-            channels, output_ch, kernel_size=1, stride=1, padding=0
+            channels, num_classes, kernel_size=1, stride=1, padding=0
         )
         self.last_activation = nn.Hardtanh()
 
