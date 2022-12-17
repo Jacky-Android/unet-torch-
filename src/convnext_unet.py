@@ -73,8 +73,8 @@ class U_ConvNext(nn.Module):
         input_shape = x.shape[-2:]
         backbone_out = self.backbone(x)
         
-        x = self.up1(backbone_out['stage7'], backbone_out['stage5'])
-        x = self.up2(x, backbone_out['stage3'])
+        x = self.up1(backbone_out['stage4'], backbone_out['stage3'])
+        x = self.up2(x, backbone_out['stage2'])
         x = self.up3(x, backbone_out['stage1'])
         x = self.up4(x, backbone_out['stage0'])
         x = self.conv(x)
