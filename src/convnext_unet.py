@@ -78,11 +78,11 @@ class U_ConvNext(nn.Module):
         return_layers = dict([(str(j), f"stage{i}") for i, j in enumerate(stage_indices)])
         self.backbone = IntermediateLayerGetter(backbone, return_layers=return_layers)
 
-        c = self.stage_out_channels[4] + self.stage_out_channels[3]
-        self.up1 = Up(c, self.stage_out_channels[3])
-        c = self.stage_out_channels[3] + self.stage_out_channels[2]
-        self.up2 = Up(c, self.stage_out_channels[2])
-        c = self.stage_out_channels[2] + self.stage_out_channels[1]
+        c = self.stage_out_channels[7] + self.stage_out_channels[5]
+        self.up1 = Up(c, self.stage_out_channels[5])
+        c = self.stage_out_channels[5] + self.stage_out_channels[3]
+        self.up2 = Up(c, self.stage_out_channels[3])
+        c = self.stage_out_channels[3] + self.stage_out_channels[1]
         self.up3 = Up(c, self.stage_out_channels[1])
         c = self.stage_out_channels[1] + self.stage_out_channels[0]
         self.up4 = Up(c, self.stage_out_channels[0])
@@ -92,10 +92,9 @@ class U_ConvNext(nn.Module):
         input_shape = x.shape[-2:]
         backbone_out = self.backbone(x)
         
-        x = self.up1(backbone_out['stage4'], backbone_out['stage3'])
-        x = self.up2(x, backbone_out['stage2'])
+        x = self.up1(backbone_out['stage7'], backbone_out['stage5'])
+        x = self.up2(x, backbone_out['stage3'])
         x = self.up3(x, backbone_out['stage1'])
         x = self.up4(x, backbone_out['stage0'])
-        x = self.conv(x)
         x = F.interpolate(x, size=input_shape, mode="bilinear", align_corners=False)
         return {"out": x}
