@@ -59,13 +59,13 @@ class U_ConvNext(nn.Module):
         return_layers = dict([(str(j), f"stage{i}") for i, j in enumerate(stage_indices)])
         self.backbone = IntermediateLayerGetter(backbone, return_layers=return_layers)
 
-        #c = self.stage_out_channels[4] + self.stage_out_channels[3]
-        self.up1 = Up(self.stage_out_channels[3], self.stage_out_channels[2])
         c = self.stage_out_channels[3] + self.stage_out_channels[2]
-        self.up2 = Up(self.stage_out_channels[2], self.stage_out_channels[1])
+        self.up1 = Up(c, self.stage_out_channels[2])
         c = self.stage_out_channels[2] + self.stage_out_channels[1]
-        self.up3 = Up(self.stage_out_channels[1], self.stage_out_channels[0])
+        self.up2 = Up(c, self.stage_out_channels[1])
         c = self.stage_out_channels[1] + self.stage_out_channels[0]
+        self.up3 = Up(c, self.stage_out_channels[0])
+        #c = self.stage_out_channels[1] + self.stage_out_channels[0]
         #self.up4 = Up(self.stage_out_channels[1], self.stage_out_channels[0])
         self.conv = OutConv(self.stage_out_channels[0], num_classes=num_classes)
 
