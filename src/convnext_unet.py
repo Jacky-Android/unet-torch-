@@ -73,7 +73,7 @@ class U_ConvNext(nn.Module):
 
         backbone = backbone.features
         
-        stage_indices = [1,2,3,5,7]
+        stage_indices = [0,1,3,5,7]
         self.stage_out_channels = [128, 128,256,512,1024]
         return_layers = dict([(str(j), f"stage{i}") for i, j in enumerate(stage_indices)])
         self.backbone = IntermediateLayerGetter(backbone, return_layers=return_layers)
