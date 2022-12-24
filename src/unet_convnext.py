@@ -182,7 +182,7 @@ class Unet_ConvNext(nn.Module):
         # encoding path
         x1 = self.Conv1(x)
         
-        print(x1.shape)
+        
 
         x2 = self.Maxpool(x1)
         x2 = self.Conv2(x2)
