@@ -93,27 +93,27 @@ class U_Net_eca(nn.Module):   #添加了空间注意力和通道注意力
         # encoding path
         #x1 = self.se1(x)+x
         x1 = self.Conv1(x)
-        x1 = self.eca1(x1)
+        x1 = self.eca1(x1)+x1
         
 
         x2 = self.Maxpool(x1)
         x2 = self.Conv2(x2)
-        x2= self.eca2(x2)
+        x2= self.eca2(x2)+x2
         
         
         x3 = self.Maxpool(x2)
         x3 = self.Conv3(x3)
-        x3= self.eca3(x3)
+        x3= self.eca3(x3)+x3
         
 
         x4 = self.Maxpool(x3)
         x4 = self.Conv4(x4)
-        x4 = self.eca4(x4)
+        x4 = self.eca4(x4)+x4
         
 
         x5 = self.Maxpool(x4)
         x5 = self.Conv5(x5)
-        x5 = self.eca5(x5)
+        x5 = self.eca5(x5)+x5
 
         # decoding + concat 
         
