@@ -8,3 +8,4 @@ from .unet_networks import U_Net,AttU_Net,R2U_Net,R2AttU_Net
 from .segnet import SegNet
 from .unet_sc import U_Net_sc
 from .unet_selayer import U_Net_se
+from .unet_eca import U_Net_eca
