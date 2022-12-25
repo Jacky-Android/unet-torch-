@@ -12,13 +12,15 @@
 * [unet_se](https://github.com/Jacky-Android/unet-torch-/blob/main/src/unet_selayer.py)
 * [mobilenet_uet](https://github.com/Jacky-Android/unet-torch-/blob/main/src/mobilenet_unet.py)
 * [unet_networks(unet_attention,R2UNet,R2UNet_attention)](https://github.com/Jacky-Android/unet-torch-/blob/main/src/unet_networks.py)
+* [unet_eca](https://github.com/Jacky-Android/unet-torch-/blob/main/src/unet_eca.py)
 ## 环境配置：
 * Python3.6/3.7/3.8
 * Pytorch1.10
 * Ubuntu或Centos(Windows暂不支持多GPU训练)
 * 最好使用GPU训练
 * 详细环境配置见`requirements.txt`
-
+## unet的提出，但是unet还有很大的改进可能
+![image](https://img-blog.csdnimg.cn/20210316213927771.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3dlaXhpbl80NTA3NDU2OA==,size_16,color_FFFFFF,t_70)
 ## 文件结构：
 ```
   ├── src: 搭建U-Net模型代码
