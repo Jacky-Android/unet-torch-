@@ -6,3 +6,4 @@ from .convnext_unet import U_ConvNext
 from .unet_convnext import Unet_ConvNext
 from .unet_networks import U_Net,AttU_Net,R2U_Net,R2AttU_Net
 from .segnet import SegNet
+from .unet_sc import U_Net_sc
