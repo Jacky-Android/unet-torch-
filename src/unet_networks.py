@@ -269,7 +269,7 @@ class R2U_Net(nn.Module):
 
         d1 = self.Conv_1x1(d2)
 
-        return d1
+        return {"out":d1}
 
 
 
