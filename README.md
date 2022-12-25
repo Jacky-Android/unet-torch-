@@ -3,7 +3,8 @@
 ## 该项目主要参考以下开源仓库
 * [https://github.com/milesial/Pytorch-UNet](https://github.com/milesial/Pytorch-UNet)
 * [https://github.com/pytorch/vision](https://github.com/pytorch/vision)
-
+## 拥有unet版本：
+unet,vgg16unet,convnext_unet,segnet,unet_cbam,unet_se,mobilenet_uet,unet_networks(unet_attention,R2UNet,R2UNet_attention)
 ## 环境配置：
 * Python3.6/3.7/3.8
 * Pytorch1.10
