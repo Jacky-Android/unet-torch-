@@ -91,7 +91,8 @@ class Block(nn.Module):
         
         
         shortcut = self.link(x)
-        
+        x = self.downsample(x)
+        x = self.layernorm(x)
         x = self.dwconv(x)
         x = x.permute(0, 2, 3, 1)  # [N, C, H, W] -> [N, H, W, C]
         x = self.norm(x)
@@ -101,8 +102,6 @@ class Block(nn.Module):
         if self.gamma is not None:
             x = self.gamma * x
         x = x.permute(0, 3, 1, 2)  # [N, H, W, C] -> [N, C, H, W]
-        x = self.downsample(x)
-        x = self.layernorm(x)
         x = shortcut + self.drop_path(x)
         
         
@@ -195,23 +194,23 @@ class U_Net_convnextblock(nn.Module):
 
         # decoding + concat path
         d5 = self.Up5(x5)
-        #d5 = torch.cat((x4,d5),dim=1)
-        d5 = self.relu(d5+x4)
+        d5 = torch.cat((x4,d5),dim=1)
+        #d5 = self.relu(d5+x4)
         d5 = self.Up_conv5(d5)
         
         d4 = self.Up4(d5)
-        #d4 = torch.cat((x3,d4),dim=1)
-        d4 = self.relu(d4+x3)
+        d4 = torch.cat((x3,d4),dim=1)
+        #d4 = self.relu(d4+x3)
         d4 = self.Up_conv4(d4)
 
         d3 = self.Up3(d4)
-        #d3 = torch.cat((x2,d3),dim=1)
-        d3 = self.relu(d3+x2)
+        d3 = torch.cat((x2,d3),dim=1)
+        #d3 = self.relu(d3+x2)
         d3 = self.Up_conv3(d3)
 
         d2 = self.Up2(d3)
-        #d2 = torch.cat((x1,d2),dim=1)
-        d2 = self.relu(d2+x1)
+        d2 = torch.cat((x1,d2),dim=1)
+        #d2 = self.relu(d2+x1)
         d2 = self.Up_conv2(d2)
 
         d1 = self.Conv_1x1(d2)
