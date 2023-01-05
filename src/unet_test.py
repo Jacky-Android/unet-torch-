@@ -155,16 +155,16 @@ class U_Net_convnextblock(nn.Module):
 
         
         self.Up5 = up_conv(ch_in=1024,ch_out=512)  #1024 512
-        self.Up_conv5 = conv_block(ch_in=512, ch_out=512)  
+        self.Up_conv5 = conv_block(ch_in=1024, ch_out=512)  
 
         self.Up4 = up_conv(ch_in=512,ch_out=256)  #512 256
-        self.Up_conv4 = conv_block(ch_in=256, ch_out=256)  
+        self.Up_conv4 = conv_block(ch_in=512, ch_out=256)  
         
         self.Up3 = up_conv(ch_in=256,ch_out=128)  #256 128
-        self.Up_conv3 = conv_block(ch_in=128, ch_out=128) 
+        self.Up_conv3 = conv_block(ch_in=256, ch_out=128) 
         
         self.Up2 = up_conv(ch_in=128,ch_out=64) #128 64
-        self.Up_conv2 = conv_block(ch_in=64, ch_out=64)  
+        self.Up_conv2 = conv_block(ch_in=128, ch_out=64)  
 
         self.Conv_1x1 = nn.Conv2d(64,num_classes,kernel_size=1,stride=1,padding=0)  #64
 
