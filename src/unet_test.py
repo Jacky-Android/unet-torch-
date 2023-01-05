@@ -91,8 +91,7 @@ class Block(nn.Module):
         
         
         shortcut = self.link(x)
-        x = self.downsample(x)
-        x = self.layernorm(x)
+        
         x = self.dwconv(x)
         x = x.permute(0, 2, 3, 1)  # [N, C, H, W] -> [N, H, W, C]
         x = self.norm(x)
@@ -102,7 +101,8 @@ class Block(nn.Module):
         if self.gamma is not None:
             x = self.gamma * x
         x = x.permute(0, 3, 1, 2)  # [N, H, W, C] -> [N, C, H, W]
-
+        x = self.downsample(x)
+        x = self.layernorm(x)
         x = shortcut + self.drop_path(x)
         
         
