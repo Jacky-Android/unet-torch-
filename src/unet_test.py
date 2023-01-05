@@ -2,7 +2,38 @@ from typing import Dict
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+class SELayer(nn.Module):
+    def __init__(self, channel, reduction=16):
+        super(SELayer, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Sequential(
+            nn.Linear(channel, channel // reduction, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Linear(channel // reduction, channel, bias=False),
+            nn.Sigmoid()
+        )
 
+    def forward(self, x):
+        b, c, _, _ = x.size()
+        y = self.avg_pool(x).view(b, c)
+        y = self.fc(y).view(b, c, 1, 1)
+        out = x * y.expand_as(x)
+        return out
+class conv_block(nn.Module):
+    def __init__(self,ch_in,ch_out):
+        super(conv_block,self).__init__()
+        self.conv = nn.Sequential(
+            nn.Conv2d(ch_in, ch_out, kernel_size=3,stride=1,padding=1,bias=True),
+            nn.BatchNorm2d(ch_out),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(ch_out, ch_out, kernel_size=3,stride=1,padding=1,bias=True),
+            nn.BatchNorm2d(ch_out),
+            nn.ReLU(inplace=True)
+        )
+
+    def forward(self,x):
+        x = self.conv(x)
+        return x
 def drop_path(x, drop_prob: float = 0., training: bool = False):
     """Drop paths (Stochastic Depth) per sample (when applied in main path of residual blocks).
     This is the same as the DropConnect impl I created for EfficientNet, etc networks, however,
@@ -85,11 +116,11 @@ class Block(nn.Module):
                                   requires_grad=True) if layer_scale_init_value > 0 else None
         self.drop_path = DropPath(drop_rate) if drop_rate > 0. else nn.Identity()
         self.link = nn.Conv2d(dim,dim,kernel_size=1,stride = 2)
-        
+        self.se_attention = SELayer(dim)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         
-        
+        se = self.link(self.se_attention(x))
         shortcut = self.link(x)
         x = self.downsample(x)
         x = self.layernorm(x)
@@ -102,7 +133,7 @@ class Block(nn.Module):
         if self.gamma is not None:
             x = self.gamma * x
         x = x.permute(0, 3, 1, 2)  # [N, H, W, C] -> [N, C, H, W]
-        x = shortcut + self.drop_path(x)
+        x = se + shortcut + self.drop_path(x)
         
         
         return x
@@ -155,16 +186,16 @@ class U_Net_convnextblock(nn.Module):
 
         
         self.Up5 = up_conv(ch_in=1024,ch_out=512)  #1024 512
-        self.Up_conv5 = conv_block(ch_in=1024, ch_out=512)  
+        self.Up_conv5 = conv_block(ch_in=512, ch_out=512)  
 
         self.Up4 = up_conv(ch_in=512,ch_out=256)  #512 256
-        self.Up_conv4 = conv_block(ch_in=512, ch_out=256)  
+        self.Up_conv4 = conv_block(ch_in=256, ch_out=256)  
         
         self.Up3 = up_conv(ch_in=256,ch_out=128)  #256 128
-        self.Up_conv3 = conv_block(ch_in=256, ch_out=128) 
+        self.Up_conv3 = conv_block(ch_in=128, ch_out=128) 
         
         self.Up2 = up_conv(ch_in=128,ch_out=64) #128 64
-        self.Up_conv2 = conv_block(ch_in=128, ch_out=64)  
+        self.Up_conv2 = conv_block(ch_in=64, ch_out=64)  
 
         self.Conv_1x1 = nn.Conv2d(64,num_classes,kernel_size=1,stride=1,padding=0)  #64
 
@@ -196,6 +227,7 @@ class U_Net_convnextblock(nn.Module):
         d5 = self.Up5(x5)
         d5 = torch.cat((x4,d5),dim=1)
         #d5 = self.relu(d5+x4)
+        #print(d5.shape)
         d5 = self.Up_conv5(d5)
         
         d4 = self.Up4(d5)
