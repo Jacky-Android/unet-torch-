@@ -85,12 +85,12 @@ class Block(nn.Module):
         self.drop_path = DropPath(drop_rate) if drop_rate > 0. else nn.Identity()
         self.downsample = nn.Conv2d(dim, dim, kernel_size=2, stride=2)
         self.layernorm = LayerNorm(dim, eps=1e-6, data_format="channels_first")
-        self.avgpool = nn.AvgPool2d(kernel_size=2,stride=2)
+        
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         
         
-        shortcut = self.avgpool(x)
+        shortcut = x
         x = self.dwconv(x)
         x = x.permute(0, 2, 3, 1)  # [N, C, H, W] -> [N, H, W, C]
         x = self.norm(x)
@@ -101,10 +101,10 @@ class Block(nn.Module):
             x = self.gamma * x
         x = x.permute(0, 3, 1, 2)  # [N, H, W, C] -> [N, C, H, W]
 
-        
+        x = shortcut + self.drop_path(x)
         x = self.downsample(x)
         x = self.layernorm(x)
-        x = shortcut + self.drop_path(x)
+        
         return x
 
 class conv_block(nn.Module):
