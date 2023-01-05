@@ -74,7 +74,8 @@ class Block(nn.Module):
         super().__init__()
         
         
-
+        self.downsample = nn.Conv2d(dim, dim, kernel_size=2, stride=2)
+        self.layernorm = LayerNorm(dim, eps=1e-6, data_format="channels_first")
         self.dwconv = nn.Conv2d(dim, dim, kernel_size=7, padding=3, groups=dim)  # depthwise conv
         self.norm = LayerNorm(dim, eps=1e-6, data_format="channels_last")
         self.pwconv1 = nn.Linear(dim, 4 * dim)  # pointwise/1x1 convs, implemented with linear layers
@@ -83,14 +84,15 @@ class Block(nn.Module):
         self.gamma = nn.Parameter(layer_scale_init_value * torch.ones((dim,)),
                                   requires_grad=True) if layer_scale_init_value > 0 else None
         self.drop_path = DropPath(drop_rate) if drop_rate > 0. else nn.Identity()
-        self.downsample = nn.Conv2d(dim, dim, kernel_size=2, stride=2)
-        self.layernorm = LayerNorm(dim, eps=1e-6, data_format="channels_first")
+        self.link = nn.Conv2d(dim,dim,kernel_size=1,stride = 2)
         
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         
         
-        shortcut = x
+        shortcut = self.link(x)
+        x = self.downsample(x)
+        x = self.layernorm(x)
         x = self.dwconv(x)
         x = x.permute(0, 2, 3, 1)  # [N, C, H, W] -> [N, H, W, C]
         x = self.norm(x)
@@ -102,8 +104,7 @@ class Block(nn.Module):
         x = x.permute(0, 3, 1, 2)  # [N, H, W, C] -> [N, C, H, W]
 
         x = shortcut + self.drop_path(x)
-        x = self.downsample(x)
-        x = self.layernorm(x)
+        
         
         return x
 
@@ -140,7 +141,7 @@ class up_conv(nn.Module):
 class U_Net_convnextblock(nn.Module):   
     def __init__(self,img_ch=3,num_classes:int=2,layer_scale_init_value:float=1e-6):
         super(U_Net_convnextblock,self).__init__()
-        
+        self.relu=nn.ReLU()
         #self.Maxpool = nn.MaxPool2d(kernel_size=2,stride=2)
 
         self.Conv1 = conv_block(ch_in=img_ch,ch_out=64) #64
@@ -155,16 +156,16 @@ class U_Net_convnextblock(nn.Module):
 
         
         self.Up5 = up_conv(ch_in=1024,ch_out=512)  #1024 512
-        self.Up_conv5 = conv_block(ch_in=1024, ch_out=512)  
+        self.Up_conv5 = conv_block(ch_in=512, ch_out=512)  
 
         self.Up4 = up_conv(ch_in=512,ch_out=256)  #512 256
-        self.Up_conv4 = conv_block(ch_in=512, ch_out=256)  
+        self.Up_conv4 = conv_block(ch_in=256, ch_out=256)  
         
         self.Up3 = up_conv(ch_in=256,ch_out=128)  #256 128
-        self.Up_conv3 = conv_block(ch_in=256, ch_out=128) 
+        self.Up_conv3 = conv_block(ch_in=128, ch_out=128) 
         
         self.Up2 = up_conv(ch_in=128,ch_out=64) #128 64
-        self.Up_conv2 = conv_block(ch_in=128, ch_out=64)  
+        self.Up_conv2 = conv_block(ch_in=64, ch_out=64)  
 
         self.Conv_1x1 = nn.Conv2d(64,num_classes,kernel_size=1,stride=1,padding=0)  #64
 
@@ -194,20 +195,24 @@ class U_Net_convnextblock(nn.Module):
 
         # decoding + concat path
         d5 = self.Up5(x5)
-        d5 = torch.cat((x4,d5),dim=1)
-        
+        #d5 = torch.cat((x4,d5),dim=1)
+        d5 = self.relu(d5+x4)
+        print(d5.shape)
         d5 = self.Up_conv5(d5)
         
         d4 = self.Up4(d5)
-        d4 = torch.cat((x3,d4),dim=1)
+        #d4 = torch.cat((x3,d4),dim=1)
+        d4 = self.relu(d4+x3)
         d4 = self.Up_conv4(d4)
 
         d3 = self.Up3(d4)
-        d3 = torch.cat((x2,d3),dim=1)
+        #d3 = torch.cat((x2,d3),dim=1)
+        d3 = self.relu(d3+x2)
         d3 = self.Up_conv3(d3)
 
         d2 = self.Up2(d3)
-        d2 = torch.cat((x1,d2),dim=1)
+        #d2 = torch.cat((x1,d2),dim=1)
+        d2 = self.relu(d2+x1)
         d2 = self.Up_conv2(d2)
 
         d1 = self.Conv_1x1(d2)
