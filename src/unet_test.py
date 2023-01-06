@@ -106,8 +106,8 @@ class Block(nn.Module):
         super().__init__()
         
         
-        self.downsample = nn.Conv2d(dim, dim, kernel_size=2, stride=2)
-        self.layernorm = LayerNorm(dim, eps=1e-6, data_format="channels_first")
+        #self.downsample = nn.Conv2d(dim, dim, kernel_size=2, stride=2)
+        #elf.layernorm = LayerNorm(dim, eps=1e-6, data_format="channels_first")
         self.dwconv = nn.Conv2d(dim, dim, kernel_size=7, padding=3, groups=dim)  # depthwise conv
         self.norm = LayerNorm(dim, eps=1e-6, data_format="channels_last")
         self.pwconv1 = nn.Linear(dim, 4 * dim)  # pointwise/1x1 convs, implemented with linear layers
@@ -116,15 +116,13 @@ class Block(nn.Module):
         self.gamma = nn.Parameter(layer_scale_init_value * torch.ones((dim,)),
                                   requires_grad=True) if layer_scale_init_value > 0 else None
         self.drop_path = DropPath(drop_rate) if drop_rate > 0. else nn.Identity()
-        self.link = nn.Conv2d(dim,dim,kernel_size=1,stride = 2)
+        
         
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         
         
-        shortcut = self.link(x)
-        x = self.downsample(x)
-        x = self.layernorm(x)
+        shortcut = x
         x = self.dwconv(x)
         x = x.permute(0, 2, 3, 1)  # [N, C, H, W] -> [N, H, W, C]
         x = self.norm(x)
@@ -145,10 +143,8 @@ class conv_block(nn.Module):
         self.conv = nn.Sequential(
             nn.Conv2d(ch_in, ch_out, kernel_size=3,stride=1,padding=1,bias=True),
             nn.BatchNorm2d(ch_out),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(ch_out, ch_out, kernel_size=3,stride=1,padding=1,bias=True),
-            nn.BatchNorm2d(ch_out),
             nn.ReLU(inplace=True)
+            
         )
 
     def forward(self,x):
@@ -174,22 +170,32 @@ class U_Net_convnextblock(nn.Module):
         super(U_Net_convnextblock,self).__init__()
         self.relu=nn.ReLU()
         #self.Maxpool = nn.MaxPool2d(kernel_size=2,stride=2)
-
+        #self.skipconv = nn.conv2d(64,64, kernel_size=1, stride=2)
+       
         self.Conv1 = conv_block(ch_in=img_ch,ch_out=64) #64
         self.se1 = SELayer(64)
         self.block1 = Block(dim=64,layer_scale_init_value=layer_scale_init_value)
+        self.skipconv1 = nn.Conv2d(64,64, kernel_size=2, stride=2)
+        self.downlayers1 = nn.Conv2d(64,64, kernel_size=2, stride=2)
 
         self.Conv2 = conv_block(ch_in=64,ch_out=128)  #64 128
         self.block2 = Block(dim=128,layer_scale_init_value=layer_scale_init_value)
         self.se2 = SELayer(128)
+        self.skipconv2 = nn.Conv2d(128,128, kernel_size=1, stride=2)
+        self.downlayers2 = nn.Conv2d(128,128, kernel_size=2, stride=2)
         
         self.Conv3 = conv_block(ch_in=128,ch_out=256) #128 256
         self.block3 = Block(dim=256,layer_scale_init_value=layer_scale_init_value)
         self.se3 = SELayer(256)
+        self.skipconv3 = nn.Conv2d(256,256, kernel_size=1, stride=2)
+        self.downlayers3 = nn.Conv2d(256,256, kernel_size=2, stride=2)
 
         self.Conv4 = conv_block(ch_in=256,ch_out=512) #256 512
         self.block4 = Block(dim=512,layer_scale_init_value=layer_scale_init_value)
         self.se4 = SELayer(512)
+        self.skipconv4 = nn.Conv2d(512,512, kernel_size=1, stride=2)
+        self.downlayers4 = nn.Conv2d(512,512, kernel_size=2, stride=2)
+
         self.Conv5 = conv_block(ch_in=512,ch_out=1024) #512 1024
 
         
@@ -212,45 +218,49 @@ class U_Net_convnextblock(nn.Module):
         # encoding path
         x1 = self.Conv1(x)
         x1_se = self.se1(x1)
-        
+        x1 = self.block1(self.block1(x1))
+        x1 = x1+x1_se
 
-        x2 = self.block1(x1)+self.block1(x1_se)
+        x2 = self.skipconv1(x1)+self.downlayers1(x1)
         x2 = self.Conv2(x2)
         x2_se = self.se2(x2)
-       
-        
-        x3 = self.block2(x2)+self.block2(x2_se)
+        x2 = self.block2(self.block2(x2))
+        x2 = x2+x2_se
+
+        x3 = self.skipconv2(x2)+self.downlayers2(x2)
         x3 = self.Conv3(x3)
         x3_se = self.se3(x3)
-        
+        x3 = self.block3(self.block3(x3))
+        x3 = x3+x3_se
 
-        x4 = self.block3(x3)+self.block3(x3_se)
+        x4 = self.skipconv3(x3)+self.downlayers3(x3)
         x4 = self.Conv4(x4)
         x4_se = self.se4(x4)
-        
+        x4 = self.block4(self.block4(x4))
+        x4 = x4+x4_se
 
-        x5 = self.block4(x4)+self.block4(x4_se)
+        x5 = self.skipconv4(x4)+self.downlayers4(x4)
         x5 = self.Conv5(x5)
 
         # decoding + concat path
         d5 = self.Up5(x5)
-        d5 = torch.cat((x4_se,d5),dim=1)
+        d5 = torch.cat((x4,d5),dim=1)
         #d5 = self.relu(d5+x4)
         #print(d5.shape)
         d5 = self.Up_conv5(d5)
         
         d4 = self.Up4(d5)
-        d4 = torch.cat((x3_se,d4),dim=1)
+        d4 = torch.cat((x3,d4),dim=1)
         #d4 = self.relu(d4+x3)
         d4 = self.Up_conv4(d4)
 
         d3 = self.Up3(d4)
-        d3 = torch.cat((x2_se,d3),dim=1)
+        d3 = torch.cat((x2,d3),dim=1)
         #d3 = self.relu(d3+x2)
         d3 = self.Up_conv3(d3)
 
         d2 = self.Up2(d3)
-        d2 = torch.cat((x1_se,d2),dim=1)
+        d2 = torch.cat((x1,d2),dim=1)
         #d2 = self.relu(d2+x1)
         d2 = self.Up_conv2(d2)
 
