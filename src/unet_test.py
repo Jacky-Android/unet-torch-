@@ -177,24 +177,28 @@ class U_Net_convnextblock(nn.Module):
         self.block1 = Block(dim=64,layer_scale_init_value=layer_scale_init_value)
         self.skipconv1 = nn.Conv2d(64,64, kernel_size=2, stride=2)
         self.downlayers1 = nn.Conv2d(64,64, kernel_size=2, stride=2)
+	self.layernorm1 = LayerNorm(64, eps=1e-6, data_format="channels_first")
 
         self.Conv2 = conv_block(ch_in=64,ch_out=128)  #64 128
         self.block2 = Block(dim=128,layer_scale_init_value=layer_scale_init_value)
         self.se2 = SELayer(128)
         self.skipconv2 = nn.Conv2d(128,128, kernel_size=1, stride=2)
         self.downlayers2 = nn.Conv2d(128,128, kernel_size=2, stride=2)
+	self.layernorm2 = LayerNorm(128, eps=1e-6, data_format="channels_first")
         
         self.Conv3 = conv_block(ch_in=128,ch_out=256) #128 256
         self.block3 = Block(dim=256,layer_scale_init_value=layer_scale_init_value)
         self.se3 = SELayer(256)
         self.skipconv3 = nn.Conv2d(256,256, kernel_size=1, stride=2)
         self.downlayers3 = nn.Conv2d(256,256, kernel_size=2, stride=2)
+	self.layernorm3 = LayerNorm(256, eps=1e-6, data_format="channels_first")
 
         self.Conv4 = conv_block(ch_in=256,ch_out=512) #256 512
         self.block4 = Block(dim=512,layer_scale_init_value=layer_scale_init_value)
         self.se4 = SELayer(512)
         self.skipconv4 = nn.Conv2d(512,512, kernel_size=1, stride=2)
         self.downlayers4 = nn.Conv2d(512,512, kernel_size=2, stride=2)
+	self.layernorm4 = LayerNorm(512, eps=1e-6, data_format="channels_first")
 
         self.Conv5 = conv_block(ch_in=512,ch_out=1024) #512 1024
 
@@ -220,23 +224,23 @@ class U_Net_convnextblock(nn.Module):
         x1 = self.Conv1(x)
         x1 = self.block1(self.block1(x1))
 
-        x2 = self.skipconv1(x1)+self.downlayers1(x1)
+        x2 = self.skipconv1(x1)+self.layernorm1(self.downlayers1(x1))
         x2 = self.se1(x2)
         x2 = self.Conv2(x2)
         x2 = self.block2(self.block2(x2))
 
-        x3 = self.skipconv2(x2)+self.downlayers2(x2)
+        x3 = self.skipconv2(x2)+self.layernorm2(self.downlayers2(x2))
         x3 = self.se2(x3)
         x3 = self.Conv3(x3)
         x3 = self.block3(self.block3(x3))
         
 
-        x4 = self.skipconv3(x3)+self.downlayers3(x3)
+        x4 = self.skipconv3(x3)+self.layernorm3(self.downlayers3(x3))
         x4 = self.se3(x4)
         x4 = self.Conv4(x4)
         x4 = self.block4(self.block4(x4))
 
-        x5 = self.skipconv4(x4)+self.downlayers4(x4)
+        x5 = self.skipconv4(x4)+self.layernorm4(self.downlayers4(x4))
         x5 = self.Conv5(x5)
 
         # decoding + concat path
