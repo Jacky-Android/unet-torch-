@@ -2,6 +2,7 @@ from typing import Dict
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 class SELayer(nn.Module):
     def __init__(self, channel, reduction=16):
         super(SELayer, self).__init__()
@@ -116,11 +117,11 @@ class Block(nn.Module):
                                   requires_grad=True) if layer_scale_init_value > 0 else None
         self.drop_path = DropPath(drop_rate) if drop_rate > 0. else nn.Identity()
         self.link = nn.Conv2d(dim,dim,kernel_size=1,stride = 2)
-        self.se_attention = SELayer(dim)
+        
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         
-        se = self.link(self.se_attention(x))
+        
         shortcut = self.link(x)
         x = self.downsample(x)
         x = self.layernorm(x)
@@ -133,7 +134,7 @@ class Block(nn.Module):
         if self.gamma is not None:
             x = self.gamma * x
         x = x.permute(0, 3, 1, 2)  # [N, H, W, C] -> [N, C, H, W]
-        x = se + shortcut + self.drop_path(x)
+        x =  shortcut + self.drop_path(x)
         
         
         return x
@@ -175,13 +176,20 @@ class U_Net_convnextblock(nn.Module):
         #self.Maxpool = nn.MaxPool2d(kernel_size=2,stride=2)
 
         self.Conv1 = conv_block(ch_in=img_ch,ch_out=64) #64
+        self.se1 = SELayer(64)
         self.block1 = Block(dim=64,layer_scale_init_value=layer_scale_init_value)
+
         self.Conv2 = conv_block(ch_in=64,ch_out=128)  #64 128
         self.block2 = Block(dim=128,layer_scale_init_value=layer_scale_init_value)
+        self.se2 = SELayer(128)
+        
         self.Conv3 = conv_block(ch_in=128,ch_out=256) #128 256
         self.block3 = Block(dim=256,layer_scale_init_value=layer_scale_init_value)
+        self.se3 = SELayer(256)
+
         self.Conv4 = conv_block(ch_in=256,ch_out=512) #256 512
         self.block4 = Block(dim=512,layer_scale_init_value=layer_scale_init_value)
+        self.se4 = SELayer(512)
         self.Conv5 = conv_block(ch_in=512,ch_out=1024) #512 1024
 
         
@@ -203,45 +211,46 @@ class U_Net_convnextblock(nn.Module):
     def forward(self,x):
         # encoding path
         x1 = self.Conv1(x)
-       
+        x1_se = self.se1(x1)
         
 
-        x2 = self.block1(x1)
-        
+        x2 = self.block1(x1)+self.block1(x1_se)
         x2 = self.Conv2(x2)
+        x2_se = self.se2(x2)
        
         
-        x3 = self.block2(x2)
-        
+        x3 = self.block2(x2)+self.block2(x2_se)
         x3 = self.Conv3(x3)
+        x3_se = self.se3(x3)
         
 
-        x4 = self.block3(x3)
+        x4 = self.block3(x3)+self.block3(x3_se)
         x4 = self.Conv4(x4)
+        x4_se = self.se4(x4)
         
 
-        x5 = self.block4(x4)
+        x5 = self.block4(x4)+self.block4(x4_se)
         x5 = self.Conv5(x5)
 
         # decoding + concat path
         d5 = self.Up5(x5)
-        d5 = torch.cat((x4,d5),dim=1)
+        d5 = torch.cat((x4_se,d5),dim=1)
         #d5 = self.relu(d5+x4)
         #print(d5.shape)
         d5 = self.Up_conv5(d5)
         
         d4 = self.Up4(d5)
-        d4 = torch.cat((x3,d4),dim=1)
+        d4 = torch.cat((x3_se,d4),dim=1)
         #d4 = self.relu(d4+x3)
         d4 = self.Up_conv4(d4)
 
         d3 = self.Up3(d4)
-        d3 = torch.cat((x2,d3),dim=1)
+        d3 = torch.cat((x2_se,d3),dim=1)
         #d3 = self.relu(d3+x2)
         d3 = self.Up_conv3(d3)
 
         d2 = self.Up2(d3)
-        d2 = torch.cat((x1,d2),dim=1)
+        d2 = torch.cat((x1_se,d2),dim=1)
         #d2 = self.relu(d2+x1)
         d2 = self.Up_conv2(d2)
 
