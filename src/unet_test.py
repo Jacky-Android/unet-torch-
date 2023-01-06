@@ -216,28 +216,25 @@ class U_Net_convnextblock(nn.Module):
 
     def forward(self,x):
         # encoding path
+        #x1 = self.se1(x)
         x1 = self.Conv1(x)
-        x1_se = self.se1(x1)
         x1 = self.block1(self.block1(x1))
-        x1 = x1+x1_se
 
         x2 = self.skipconv1(x1)+self.downlayers1(x1)
+        x2 = self.se1(x2)
         x2 = self.Conv2(x2)
-        x2_se = self.se2(x2)
         x2 = self.block2(self.block2(x2))
-        x2 = x2+x2_se
 
         x3 = self.skipconv2(x2)+self.downlayers2(x2)
+        x3 = self.se2(x3)
         x3 = self.Conv3(x3)
-        x3_se = self.se3(x3)
         x3 = self.block3(self.block3(x3))
-        x3 = x3+x3_se
+        
 
         x4 = self.skipconv3(x3)+self.downlayers3(x3)
+        x4 = self.se3(x4)
         x4 = self.Conv4(x4)
-        x4_se = self.se4(x4)
         x4 = self.block4(self.block4(x4))
-        x4 = x4+x4_se
 
         x5 = self.skipconv4(x4)+self.downlayers4(x4)
         x5 = self.Conv5(x5)
@@ -248,21 +245,25 @@ class U_Net_convnextblock(nn.Module):
         #d5 = self.relu(d5+x4)
         #print(d5.shape)
         d5 = self.Up_conv5(d5)
+        d5 = self.block4(d5)
         
         d4 = self.Up4(d5)
         d4 = torch.cat((x3,d4),dim=1)
         #d4 = self.relu(d4+x3)
         d4 = self.Up_conv4(d4)
+        d4 = self.block3(d4)
 
         d3 = self.Up3(d4)
         d3 = torch.cat((x2,d3),dim=1)
         #d3 = self.relu(d3+x2)
         d3 = self.Up_conv3(d3)
+        d3 = self.block2(d3)
 
         d2 = self.Up2(d3)
         d2 = torch.cat((x1,d2),dim=1)
         #d2 = self.relu(d2+x1)
         d2 = self.Up_conv2(d2)
+        d2 = self.block1(d2)
 
         d1 = self.Conv_1x1(d2)
 
