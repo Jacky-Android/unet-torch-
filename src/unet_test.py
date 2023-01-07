@@ -234,7 +234,7 @@ class convnextAttU_Net(nn.Module):
             x4 = self.block4(x4)
 
         x5 = self.downlayers4(self.layernorm4(x4))
-        for i in range(1,28):
+        for i in range(1,10):
             x5 = self.block5(self.block5(self.block5(x5)))
 
         # decoding + concat path
