@@ -141,7 +141,7 @@ class conv_block(nn.Module):
     def __init__(self,ch_in,ch_out):
         super(conv_block,self).__init__()
         self.conv = nn.Sequential(
-            nn.Conv2d(ch_in, ch_out, kernel_size=3,stride=1,padding=1,bias=True),
+            nn.Conv2d(ch_in, ch_out, kernel_size=1,stride=1,padding=0,bias=True),
             nn.BatchNorm2d(ch_out),
             nn.ReLU(inplace=True)
             
