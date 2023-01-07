@@ -140,6 +140,9 @@ class conv_block(nn.Module):
         self.conv = nn.Sequential(
             nn.Conv2d(ch_in, ch_out, kernel_size=1,stride=1,padding=0,bias=True),
             nn.BatchNorm2d(ch_out),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(ch_out, ch_out, kernel_size=1,stride=1,padding=0,bias=True),
+            nn.BatchNorm2d(ch_out),
             nn.ReLU(inplace=True)
             
         )
@@ -168,18 +171,17 @@ class up_conv(nn.Module):
 class convnextAttU_Net(nn.Module):   
     def __init__(self,img_ch=3,num_classes:int=2,layer_scale_init_value:float=1e-6):
         super(convnextAttU_Net,self).__init__()
-        self.relu=nn.ReLU()
+        #self.relu=nn.ReLU()
         #self.Maxpool = nn.MaxPool2d(kernel_size=2,stride=2)
-        #self.skipconv = nn.conv2d(64,64, kernel_size=1, stride=2)
        
        
         self.Conv1 = conv_block(ch_in=img_ch,ch_out=64) #64
         self.layernorm1 = LayerNorm(64, eps=1e-6, data_format="channels_first")
-        self.downlayers1 = nn.Conv2d(64,128, kernel_size=2, stride=2)
+        self.downlayers1 = nn.Conv2d(64,64, kernel_size=2, stride=2)
         
 
-        
-        self.block2 = Block(dim=128,layer_scale_init_value=layer_scale_init_value)
+        self.Conv2 = conv_block(ch_in=64,ch_out=128)
+        #self.block2 = Block(dim=128,layer_scale_init_value=layer_scale_init_value)
         self.layernorm2 = LayerNorm(128, eps=1e-6, data_format="channels_first")
         self.downlayers2 = nn.Conv2d(128,256, kernel_size=2, stride=2)
         
@@ -193,7 +195,7 @@ class convnextAttU_Net(nn.Module):
         self.layernorm4 = LayerNorm(512, eps=1e-6, data_format="channels_first")
         self.downlayers4 = nn.Conv2d(512,1024, kernel_size=2, stride=2)
         
-
+        self.block5 = Block(dim=1024,layer_scale_init_value=layer_scale_init_value)
         
         self.Up5 = up_conv(ch_in=1024,ch_out=512)
         self.Att5 = Attention_block(F_g=512,F_l=512,F_int=256)
@@ -221,17 +223,19 @@ class convnextAttU_Net(nn.Module):
         
 
         x2 = self.downlayers1(self.layernorm1(x1))
-        x2 = self.block2(self.block2(self.block2(x2)))
+        x2 = self.Conv2(x2)
 
         x3 = self.downlayers2(self.layernorm2(x2))
         x3 = self.block3(self.block3(self.block3(x3)))
         
 
         x4 = self.downlayers3(self.layernorm3(x3))
-        for i in range(1,10):
+        for i in range(1,4):
             x4 = self.block4(x4)
 
         x5 = self.downlayers4(self.layernorm4(x4))
+        for i in range(1,28):
+            x5 = self.block5(self.block5(self.block5(x5)))
 
         # decoding + concat path
         d5 = self.Up5(x5)
