@@ -212,7 +212,7 @@ class convnextAttU_Net(nn.Module):
         x4 = self.Conv4(self.Conv4(x3))
         x4 = self.down4(x4)#1024*1024
 
-        x5 = self.Conv5(x4)
+        x5 = self.Conv5(self.Conv5(x4))
         
         # decoding + concat path
         d5 = self.Up5(x5)#512*512
