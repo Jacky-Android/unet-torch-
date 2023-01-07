@@ -237,6 +237,6 @@ class convnextAttU_Net(nn.Module):
        
         
         d1 = self.Up1(d2)
-        d1 = self.Conv_1x1(d2)
+        d1 = self.Conv_1x1(d1)
         
         return {"out":d1}
