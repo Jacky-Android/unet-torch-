@@ -172,27 +172,27 @@ class convnextAttU_Net(nn.Module):
         #self.Maxpool = nn.MaxPool2d(kernel_size=2,stride=2)
         #self.skipconv = nn.conv2d(64,64, kernel_size=1, stride=2)
        
+       
         self.Conv1 = conv_block(ch_in=img_ch,ch_out=64) #64
-        self.block1 = Block(dim=64,layer_scale_init_value=layer_scale_init_value)
-        self.downlayers1 = nn.Conv2d(64,64, kernel_size=2, stride=2)
         self.layernorm1 = LayerNorm(64, eps=1e-6, data_format="channels_first")
-
-        self.Conv2 = conv_block(ch_in=64,ch_out=128)  #64 128
-        self.block2 = Block(dim=128,layer_scale_init_value=layer_scale_init_value)
-        self.downlayers2 = nn.Conv2d(128,128, kernel_size=2, stride=2)
-        self.layernorm2 = LayerNorm(128, eps=1e-6, data_format="channels_first")
+        self.downlayers1 = nn.Conv2d(64,128, kernel_size=2, stride=2)
         
-        self.Conv3 = conv_block(ch_in=128,ch_out=256) #128 256
+
+        
+        self.block2 = Block(dim=128,layer_scale_init_value=layer_scale_init_value)
+        self.layernorm2 = LayerNorm(128, eps=1e-6, data_format="channels_first")
+        self.downlayers2 = nn.Conv2d(128,256, kernel_size=2, stride=2)
+        
+        
         self.block3 = Block(dim=256,layer_scale_init_value=layer_scale_init_value)
-        self.downlayers3 = nn.Conv2d(256,256, kernel_size=2, stride=2)
         self.layernorm3 = LayerNorm(256, eps=1e-6, data_format="channels_first")
+        self.downlayers3 = nn.Conv2d(256,512, kernel_size=2, stride=2)
+        
 
-        self.Conv4 = conv_block(ch_in=256,ch_out=512) #256 512
         self.block4 = Block(dim=512,layer_scale_init_value=layer_scale_init_value)
-        self.downlayers4 = nn.Conv2d(512,512, kernel_size=2, stride=2)
         self.layernorm4 = LayerNorm(512, eps=1e-6, data_format="channels_first")
-
-        self.Conv5 = conv_block(ch_in=512,ch_out=1024) #512 1024
+        self.downlayers4 = nn.Conv2d(512,1024, kernel_size=2, stride=2)
+        
 
         
         self.Up5 = up_conv(ch_in=1024,ch_out=512)
@@ -218,23 +218,20 @@ class convnextAttU_Net(nn.Module):
         # encoding path
         #x1 = self.se1(x)
         x1 = self.Conv1(x)
-        x1 = self.block1(self.block1(x1))
-
-        x2 = self.layernorm1(self.downlayers1(x1))
-        x2 = self.Conv2(x2)
-        x2 = self.block2(self.block2(x2))
-
-        x3 = self.layernorm2(self.downlayers2(x2))
-        x3 = self.Conv3(x3)
-        x3 = self.block3(self.block3(x3))
         
 
-        x4 = self.layernorm3(self.downlayers3(x3))
-        x4 = self.Conv4(x4)
-        x4 = self.block4(self.block4(x4))
+        x2 = self.downlayers1(self.layernorm1(x1))
+        x2 = self.block2(self.block2(self.block2(x2)))
 
-        x5 = self.layernorm4(self.downlayers4(x4))
-        x5 = self.Conv5(x5)
+        x3 = self.downlayers2(self.layernorm2(x2))
+        x3 = self.block3(self.block3(self.block3(x3)))
+        
+
+        x4 = self.downlayers3(self.layernorm3(x3))
+        for i in range(1,10):
+            x4 = self.block4(x4)
+
+        x5 = self.downlayers4(self.layernorm4(x4))
 
         # decoding + concat path
         d5 = self.Up5(x5)
