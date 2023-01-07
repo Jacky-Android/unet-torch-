@@ -2,35 +2,7 @@ from typing import Dict
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-class Attention_block(nn.Module):
-    def __init__(self,F_g,F_l,F_int):
-        super(Attention_block,self).__init__()
-        self.W_g = nn.Sequential(
-            nn.Conv2d(F_g, F_int, kernel_size=1,stride=1,padding=0,bias=True),
-            nn.BatchNorm2d(F_int)
-            )
-        
-        self.W_x = nn.Sequential(
-            nn.Conv2d(F_l, F_int, kernel_size=1,stride=1,padding=0,bias=True),
-            nn.BatchNorm2d(F_int)
-        )
-
-        self.psi = nn.Sequential(
-            nn.Conv2d(F_int, 1, kernel_size=1,stride=1,padding=0,bias=True),
-            nn.BatchNorm2d(1),
-            nn.Sigmoid()
-        )
-        
-        self.relu = nn.ReLU(inplace=True)
-        
-    def forward(self,g,x):
-        g1 = self.W_g(g)
-        x1 = self.W_x(x)
-        psi = self.relu(g1+x1)
-        psi = self.psi(psi)
-
-        return x*psi
+from .unet_sc import CBAM
 
 def drop_path(x, drop_prob: float = 0., training: bool = False):
     """Drop paths (Stochastic Depth) per sample (when applied in main path of residual blocks).
@@ -134,16 +106,32 @@ class Block(nn.Module):
         
         return x
 
-class conv_block(nn.Module):
+class Embedding(nn.Module):
     def __init__(self,ch_in,ch_out):
-        super(conv_block,self).__init__()
+        super(Embedding,self).__init__()
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(ch_in, ch_out, kernel_size=3,stride=2,padding=1,bias=True),
+            nn.GELU())
+        self.norm = LayerNorm(ch_out,eps=1e-6, data_format="channels_first")
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(ch_out, ch_out, kernel_size=3,stride=1,padding=1,bias=True),
+            nn.GELU(),
+        )
+
+    def forward(self,x):
+        x = self.conv1(x)
+        x = self.norm(x)
+        x= self.conv2(x)
+        x = self.norm(x)
+        return x
+
+class downsample(nn.Module):
+    def __init__(self,ch_in,ch_out):
+        super(downsample,self).__init__()
         self.conv = nn.Sequential(
-            nn.Conv2d(ch_in, ch_out, kernel_size=1,stride=1,padding=0,bias=True),
-            nn.BatchNorm2d(ch_out),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(ch_out, ch_out, kernel_size=1,stride=1,padding=0,bias=True),
-            nn.BatchNorm2d(ch_out),
-            nn.ReLU(inplace=True)
+            nn.GELU(),
+            LayerNorm(ch_in,eps=1e-6, data_format="channels_first"),
+            nn.Conv2d(ch_in, ch_out, kernel_size=2,stride=2,padding=0,bias=True)
             
         )
 
@@ -158,10 +146,7 @@ class up_conv(nn.Module):
             nn.Upsample(scale_factor=2),
             nn.Conv2d(ch_in,ch_out,kernel_size=3,stride=1,padding=1,bias=True),
 		    nn.BatchNorm2d(ch_out),
-			nn.ReLU(inplace=True),
-            nn.Conv2d(ch_out,ch_out,kernel_size=3,stride=1,padding=1,bias=True),
-		    nn.BatchNorm2d(ch_out),
-			nn.ReLU(inplace=True)
+			nn.GELU()
         )
 
     def forward(self,x):
@@ -171,47 +156,40 @@ class up_conv(nn.Module):
 class convnextAttU_Net(nn.Module):   
     def __init__(self,img_ch=3,num_classes:int=2,layer_scale_init_value:float=1e-6):
         super(convnextAttU_Net,self).__init__()
-        #self.relu=nn.ReLU()
+        self.relu=nn.ReLU()
         #self.Maxpool = nn.MaxPool2d(kernel_size=2,stride=2)
-       
-       
-        self.Conv1 = conv_block(ch_in=img_ch,ch_out=64) #64
-        self.layernorm1 = LayerNorm(64, eps=1e-6, data_format="channels_first")
-        self.downlayers1 = nn.Conv2d(64,64, kernel_size=2, stride=2)
+        self.Em1 =Embedding(ch_in=img_ch,ch_out=64)
+        self.Conv1 = Block(dim=64) #64
         
-
-        self.Conv2 = conv_block(ch_in=64,ch_out=128)
+        self.down1 =downsample(ch_in=64,ch_out=128)
+        self.Conv2 = Block(dim=128)
         #self.block2 = Block(dim=128,layer_scale_init_value=layer_scale_init_value)
-        self.layernorm2 = LayerNorm(128, eps=1e-6, data_format="channels_first")
-        self.downlayers2 = nn.Conv2d(128,256, kernel_size=2, stride=2)
         
+        self.down2 =downsample(ch_in=128,ch_out=256)
+        self.Conv3 = Block(dim=256)
         
-        self.block3 = Block(dim=256,layer_scale_init_value=layer_scale_init_value)
-        self.layernorm3 = LayerNorm(256, eps=1e-6, data_format="channels_first")
-        self.downlayers3 = nn.Conv2d(256,512, kernel_size=2, stride=2)
+        self.down3 =downsample(ch_in=256,ch_out=512)
+        self.Conv4 = Block(dim=512)
         
+        self.down4 = downsample(ch_in=512,ch_out=1024)
+        self.Conv5 = Block(dim=1024)
+        
+        self.cbam1 = CBAM(channel=64)
+        self.cbam2 = CBAM(channel=128)
+        self.cbam3 = CBAM(channel=256)
+        self.cbam4 = CBAM(channel=512)
 
-        self.block4 = Block(dim=512,layer_scale_init_value=layer_scale_init_value)
-        self.layernorm4 = LayerNorm(512, eps=1e-6, data_format="channels_first")
-        self.downlayers4 = nn.Conv2d(512,1024, kernel_size=2, stride=2)
-        
-        self.block5 = Block(dim=1024,layer_scale_init_value=layer_scale_init_value)
-        
         self.Up5 = up_conv(ch_in=1024,ch_out=512)
-        self.Att5 = Attention_block(F_g=512,F_l=512,F_int=256)
-        self.Up_conv5 = conv_block(ch_in=1024, ch_out=512)
+       
 
         self.Up4 = up_conv(ch_in=512,ch_out=256)
-        self.Att4 = Attention_block(F_g=256,F_l=256,F_int=128)
-        self.Up_conv4 = conv_block(ch_in=512, ch_out=256)
+        
         
         self.Up3 = up_conv(ch_in=256,ch_out=128)
-        self.Att3 = Attention_block(F_g=128,F_l=128,F_int=64)
-        self.Up_conv3 = conv_block(ch_in=256, ch_out=128)
+        
         
         self.Up2 = up_conv(ch_in=128,ch_out=64)
-        self.Att2 = Attention_block(F_g=64,F_l=64,F_int=32)
-        self.Up_conv2 = conv_block(ch_in=128, ch_out=64) 
+        
 
         self.Conv_1x1 = nn.Conv2d(64,num_classes,kernel_size=1,stride=1,padding=0)  #64
 
@@ -219,49 +197,43 @@ class convnextAttU_Net(nn.Module):
     def forward(self,x):
         # encoding path
         #x1 = self.se1(x)
-        x1 = self.Conv1(x)
+        x = self.Em1(x)#64*64
+        x1 = self.Conv1(self.Conv1(x))
+        x1 = self.down1(x1)#128*128
+
         
+        x2 = self.Conv2(self.Conv2(x1))
+        x2 = self.down2(x2) #256*256
 
-        x2 = self.downlayers1(self.layernorm1(x1))
-        x2 = self.Conv2(x2)
+        x3 = self.Conv3(self.Conv3(x2))
+        x3 = self.down3(x3)#512*512
 
-        x3 = self.downlayers2(self.layernorm2(x2))
-        x3 = self.block3(self.block3(self.block3(x3)))
+        x4 = self.Conv4(self.Conv4(x3))
+        x4 = self.down4(x4)#1024*1024
+
+        x5 = self.Conv5(x4)
         
-
-        x4 = self.downlayers3(self.layernorm3(x3))
-        for i in range(1,4):
-            x4 = self.block4(x4)
-
-        x5 = self.downlayers4(self.layernorm4(x4))
-        for i in range(1,10):
-            x5 = self.block5(self.block5(self.block5(x5)))
-
         # decoding + concat path
-        d5 = self.Up5(x5)
-        x4 = self.Att5(g=d5,x=x4)
-        d5 = torch.cat((x4,d5),dim=1)
-        #d5 = self.relu(d5+x4)
-        #print(d5.shape)
-        d5 = self.Up_conv5(d5)
+        d5 = self.Up5(x5)#512*512
+        #d5 = torch.cat((x3,d5),dim=1)
+        print(d5.shape,x3.shape)
+        d5 = self.relu(d5+self.cbam4(x3))
+        d5 = self.Conv4(self.Conv4(d5))
         
-        d4 = self.Up4(d5)
-        x3 = self.Att4(g=d4,x=x3)
-        d4 = torch.cat((x3,d4),dim=1)
-        #d4 = self.relu(d4+x3)
-        d4 = self.Up_conv4(d4)
+        d4 = self.Up4(d5)#256*256
+        #d4 = torch.cat((x2,d4),dim=1)
+        d4 = self.relu(d4+self.cbam3(x2))
+        d4 = self.Conv3(self.Conv3(d4))
 
-        d3 = self.Up3(d4)
-        x2 = self.Att3(g=d3,x=x2)
-        d3 = torch.cat((x2,d3),dim=1)
-        #d3 = self.relu(d3+x2)
-        d3 = self.Up_conv3(d3)
+        d3 = self.Up3(d4)#128*128
+        #d3 = torch.cat((x1,d3),dim=1)
+        d3 = self.relu(d3+self.cbam2(x1))
+        d3 = self.Conv2(self.Conv2(d3))
 
-        d2 = self.Up2(d3)
-        x1 = self.Att2(g=d2,x=x1)
-        d2 = torch.cat((x1,d2),dim=1)
-        #d2 = self.relu(d2+x1)
-        d2 = self.Up_conv2(d2)
+        d2 = self.Up2(d3)#64*64
+        #d2 = torch.cat((x,d2),dim=1)
+        d2 = self.relu(d2+self.cbam1(x))
+        
        
 
         d1 = self.Conv_1x1(d2)
