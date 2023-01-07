@@ -190,6 +190,7 @@ class convnextAttU_Net(nn.Module):
         
         self.Up2 = up_conv(ch_in=128,ch_out=64)
         
+        self.Up1 = up_conv(ch_in=64,ch_out=64)
 
         self.Conv_1x1 = nn.Conv2d(64,num_classes,kernel_size=1,stride=1,padding=0)  #64
 
@@ -216,7 +217,6 @@ class convnextAttU_Net(nn.Module):
         # decoding + concat path
         d5 = self.Up5(x5)#512*512
         #d5 = torch.cat((x3,d5),dim=1)
-        print(d5.shape,x3.shape)
         d5 = self.relu(d5+self.cbam4(x3))
         d5 = self.Conv4(self.Conv4(d5))
         
@@ -233,9 +233,10 @@ class convnextAttU_Net(nn.Module):
         d2 = self.Up2(d3)#64*64
         #d2 = torch.cat((x,d2),dim=1)
         d2 = self.relu(d2+self.cbam1(x))
-        
+        d2 = self.Conv1(self.Conv1(d2))
        
-
+        
+        d1 = self.Up1(d2)
         d1 = self.Conv_1x1(d2)
-
+        
         return {"out":d1}
