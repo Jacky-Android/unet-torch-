@@ -5,13 +5,7 @@ import torch.nn.functional as F
 from .unet_sc import CBAM
 
 def drop_path(x, drop_prob: float = 0., training: bool = False):
-    """Drop paths (Stochastic Depth) per sample (when applied in main path of residual blocks).
-    This is the same as the DropConnect impl I created for EfficientNet, etc networks, however,
-    the original name is misleading as 'Drop Connect' is a different form of dropout in a separate paper...
-    See discussion: https://github.com/tensorflow/tpu/issues/494#issuecomment-532968956 ... I've opted for
-    changing the layer and argument names to 'drop path' rather than mix DropConnect as a layer name and use
-    'survival rate' as the argument.
-    """
+   
     if drop_prob == 0. or not training:
         return x
     keep_prob = 1 - drop_prob
@@ -23,8 +17,7 @@ def drop_path(x, drop_prob: float = 0., training: bool = False):
 
 
 class DropPath(nn.Module):
-    """Drop paths (Stochastic Depth) per sample  (when applied in main path of residual blocks).
-    """
+    
     def __init__(self, drop_prob=None):
         super(DropPath, self).__init__()
         self.drop_prob = drop_prob
@@ -34,12 +27,7 @@ class DropPath(nn.Module):
 
 
 class LayerNorm(nn.Module):
-    r""" LayerNorm that supports two data formats: channels_last (default) or channels_first.
-    The ordering of the dimensions in the inputs. channels_last corresponds to inputs with
-    shape (batch_size, height, width, channels) while channels_first corresponds to inputs
-    with shape (batch_size, channels, height, width).
-    """
-
+    
     def __init__(self, normalized_shape, eps=1e-6, data_format="channels_last"):
         super().__init__()
         self.weight = nn.Parameter(torch.ones(normalized_shape), requires_grad=True)
@@ -62,15 +50,7 @@ class LayerNorm(nn.Module):
             return x
 
 class Block(nn.Module):
-    r""" ConvNeXt Block. There are two equivalent implementations:
-    (1) DwConv -> LayerNorm (channels_first) -> 1x1 Conv -> GELU -> 1x1 Conv; all in (N, C, H, W)
-    (2) DwConv -> Permute to (N, H, W, C); LayerNorm (channels_last) -> Linear -> GELU -> Linear; Permute back
-    We use (2) as we find it slightly faster in PyTorch
-    Args:
-        dim (int): Number of input channels.
-        drop_rate (float): Stochastic depth rate. Default: 0.0
-        layer_scale_init_value (float): Init value for Layer Scale. Default: 1e-6.
-    """
+    
     def __init__(self, dim, drop_rate=0., layer_scale_init_value=1e-6):
         super().__init__()
         
@@ -139,6 +119,20 @@ class downsample(nn.Module):
         x = self.conv(x)
         return x
 
+class upsample(nn.Module):
+    def __init__(self,ch_in,ch_out):
+        super(upsample,self).__init__()
+        self.conv = nn.Sequential(
+            nn.GELU(),
+            LayerNorm(ch_in,eps=1e-6, data_format="channels_first"),
+            nn.Conv2d(ch_in, ch_out, kernel_size=1,stride=1,padding=0,bias=True)
+            
+        )
+
+    def forward(self,x):
+        x = self.conv(x)
+        return x
+
 class up_conv(nn.Module):
     def __init__(self,ch_in,ch_out):
         super(up_conv,self).__init__()
@@ -174,23 +168,26 @@ class convnextAttU_Net(nn.Module):
         self.down4 = downsample(ch_in=512,ch_out=1024)
         self.Conv5 = Block(dim=1024)
         
-        self.cbam1 = CBAM(channel=64)
+       
         self.cbam2 = CBAM(channel=128)
         self.cbam3 = CBAM(channel=256)
         self.cbam4 = CBAM(channel=512)
 
         self.Up5 = up_conv(ch_in=1024,ch_out=512)
+        self.ups5 = upsample(ch_in=1024,ch_out=512)
        
 
         self.Up4 = up_conv(ch_in=512,ch_out=256)
+        self.ups4 = upsample(ch_in=512,ch_out=256)
         
         
         self.Up3 = up_conv(ch_in=256,ch_out=128)
-        
+        self.Ups3 = up_conv(ch_in=256,ch_out=128)
         
         self.Up2 = up_conv(ch_in=128,ch_out=64)
+        self.Ups2 = up_conv(ch_in=128,ch_out=64)
         
-        self.Up1 = up_conv(ch_in=64,ch_out=64)
+        
 
         self.Conv_1x1 = nn.Conv2d(64,num_classes,kernel_size=1,stride=1,padding=0)  #64
 
@@ -216,27 +213,28 @@ class convnextAttU_Net(nn.Module):
         
         # decoding + concat path
         d5 = self.Up5(x5)#512*512
-        #d5 = torch.cat((x3,d5),dim=1)
-        d5 = self.relu(d5+self.cbam4(x3))
+        d5 = torch.cat((self.cbam4(x3),d5),dim=1)
+        d5 = self.ups5(d5)
+        #d5 = self.relu(d5+self.cbam4(x3))
         d5 = self.Conv4(self.Conv4(d5))
         
         d4 = self.Up4(d5)#256*256
-        #d4 = torch.cat((x2,d4),dim=1)
-        d4 = self.relu(d4+self.cbam3(x2))
+        d4 = torch.cat((self.cbam3(x2),d4),dim=1)
+        d4 = self.ups4(d4)
+        #d4 = self.relu(d4+self.cbam3(x2))
         d4 = self.Conv3(self.Conv3(d4))
 
         d3 = self.Up3(d4)#128*128
-        #d3 = torch.cat((x1,d3),dim=1)
-        d3 = self.relu(d3+self.cbam2(x1))
+        d3 = torch.cat((self.cbam2(x1),d3),dim=1)
+        d3 = self.Ups3(d3)
+        #d3 = self.relu(d3+self.cbam2(x1))
         d3 = self.Conv2(self.Conv2(d3))
 
         d2 = self.Up2(d3)#64*64
-        #d2 = torch.cat((x,d2),dim=1)
-        d2 = self.relu(d2+self.cbam1(x))
+        #d2 = self.relu(d2+self.cbam1(x))
         d2 = self.Conv1(self.Conv1(d2))
        
         
-        d1 = self.Up1(d2)
-        d1 = self.Conv_1x1(d1)
+        d1 = self.Conv_1x1(d2)
         
         return {"out":d1}
