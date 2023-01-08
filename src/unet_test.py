@@ -137,9 +137,9 @@ class up_conv(nn.Module):
     def __init__(self,ch_in,ch_out):
         super(up_conv,self).__init__()
         self.up = nn.Sequential(
-            nn.Upsample(scale_factor=2),
-            nn.Conv2d(ch_in,ch_out,kernel_size=3,stride=1,padding=1,bias=True),
-		    nn.BatchNorm2d(ch_out),
+            nn.Upsample(scale_factor=2,mode="bilinear",align_corners=True),
+            nn.Conv2d(ch_in,ch_out,kernel_size=1,stride=1,padding=0,bias=True),
+		    LayerNorm(ch_out,eps=1e-6, data_format="channels_first"),
 			nn.GELU()
         )
 
@@ -168,7 +168,7 @@ class convnextAttU_Net(nn.Module):
         self.down4 = downsample(ch_in=512,ch_out=1024)
         self.Conv5 = Block(dim=1024)
         
-       
+        self.cbam1 = CBAM(channel=64)
         self.cbam2 = CBAM(channel=128)
         self.cbam3 = CBAM(channel=256)
         self.cbam4 = CBAM(channel=512)
@@ -182,59 +182,61 @@ class convnextAttU_Net(nn.Module):
         
         
         self.Up3 = up_conv(ch_in=256,ch_out=128)
-        self.Ups3 = up_conv(ch_in=256,ch_out=128)
+        self.Ups3 = upsample(ch_in=256,ch_out=128)
         
         self.Up2 = up_conv(ch_in=128,ch_out=64)
-        self.Ups2 = up_conv(ch_in=128,ch_out=64)
+        self.Ups2 = upsample(ch_in=128,ch_out=64)
         
-        
-
+        #Expanding
+        self.Up1 = up_conv(ch_in=64,ch_out=64)
         self.Conv_1x1 = nn.Conv2d(64,num_classes,kernel_size=1,stride=1,padding=0)  #64
 
 
     def forward(self,x):
         # encoding path
         #x1 = self.se1(x)
-        x = self.Em1(x)#64*64
-        x1 = self.Conv1(self.Conv1(x))
-        x1 = self.down1(x1)#128*128
-
+        x1 = self.Em1(x)#64*64
+        x1 = self.Conv1(self.Conv1(x1))
         
-        x2 = self.Conv2(self.Conv2(x1))
-        x2 = self.down2(x2) #256*256
 
-        x3 = self.Conv3(self.Conv3(x2))
-        x3 = self.down3(x3)#512*512
-
-        x4 = self.Conv4(self.Conv4(x3))
-        x4 = self.down4(x4)#1024*1024
-
-        x5 = self.Conv5(self.Conv5(x4))
+        x2 = self.down1(x1)#128*128
+        x2 = self.Conv2(self.Conv2(x2))
+        
+        x3 = self.down2(x2) #256*256
+        x3 = self.Conv3(self.Conv3(x3))
+        
+        x4 = self.down3(x3)#512*512
+        x4 = self.Conv4(self.Conv4(x4))
+        
+        x5 = self.down4(x4)#1024*1024
+        x5 = self.Conv5(self.Conv5(x5))
         
         # decoding + concat path
         d5 = self.Up5(x5)#512*512
-        d5 = torch.cat((self.cbam4(x3),d5),dim=1)
+        d5 = torch.cat((self.cbam4(x4),d5),dim=1)
         d5 = self.ups5(d5)
         #d5 = self.relu(d5+self.cbam4(x3))
         d5 = self.Conv4(self.Conv4(d5))
         
         d4 = self.Up4(d5)#256*256
-        d4 = torch.cat((self.cbam3(x2),d4),dim=1)
+        d4 = torch.cat((self.cbam3(x3),d4),dim=1)
         d4 = self.ups4(d4)
         #d4 = self.relu(d4+self.cbam3(x2))
         d4 = self.Conv3(self.Conv3(d4))
 
         d3 = self.Up3(d4)#128*128
-        d3 = torch.cat((self.cbam2(x1),d3),dim=1)
+        d3 = torch.cat((self.cbam2(x2),d3),dim=1)
         d3 = self.Ups3(d3)
         #d3 = self.relu(d3+self.cbam2(x1))
         d3 = self.Conv2(self.Conv2(d3))
 
         d2 = self.Up2(d3)#64*64
+        d2 = torch.cat((self.cbam1(x1),d2),dim=1)
         #d2 = self.relu(d2+self.cbam1(x))
+        d2 = self.Ups2(d2)
         d2 = self.Conv1(self.Conv1(d2))
        
-        
-        d1 = self.Conv_1x1(d2)
+        d1 = self.Up1(d2)
+        d1 = self.Conv_1x1(d1)
         
         return {"out":d1}
